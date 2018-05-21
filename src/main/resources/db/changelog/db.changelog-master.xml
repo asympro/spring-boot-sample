@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.1.xsd">
+
+    <changeSet id="initial_table_ddl" author="asympro">
+        <createTable tableName="airplane">
+            <column name="sid_i" type="int">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="reg_num_c" type="varchar(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="type_c" type="varchar(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="active_flag" type="boolean" defaultValueBoolean="true"/>
+        </createTable>
+        <createTable tableName="airport">
+            <column name="iata_code_c" type="varchar(50)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="name_c" type="varchar(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="city_name_c" type="varchar(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="active_flag" type="boolean" defaultValueBoolean="true"/>
+        </createTable>
+        <createTable tableName="scheduled_flight">
+            <column name="sid_i" type="int">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="name_c" type="varchar(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="departure_cron_expression_c" type="varchar(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="arrival_cron_expression_c" type="varchar(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="departure_airport_id_c" type="varchar(50)">
+                <constraints nullable="false" foreignKeyName="fk_start_airport" references="airport(iata_code_c)"/>
+            </column>
+            <column name="arrival_airport_id_c" type="varchar(50)">
+                <constraints nullable="false" foreignKeyName="fk_end_airport" references="airport(iata_code_c)"/>
+            </column>
+            <column name="default_plane_sid_i" type="int">
+                <constraints nullable="false" foreignKeyName="fk_address_employee" references="airplane(sid_i)"/>
+            </column>
+            <column name="active_flag" type="boolean" defaultValueBoolean="true"/>
+        </createTable>
+        <createTable tableName="actual_flight">
+            <column name="sid_i" type="int">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="name_c" type="varchar(50)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="departure_ts" type="datetime">
+                <constraints nullable="false"/>
+            </column>
+            <column name="arrival_ts" type="datetime">
+                <constraints nullable="false"/>
+            </column>
+            <column name="departure_airport_id_c" type="varchar(50)">
+                <constraints nullable="false" foreignKeyName="fk_start_airport" references="airport(iata_code_c)"/>
+            </column>
+            <column name="arrival_airport_id_c" type="varchar(50)">
+                <constraints nullable="false" foreignKeyName="fk_end_airport" references="airport(iata_code_c)"/>
+            </column>
+            <column name="plane_sid_i" type="int">
+                <constraints nullable="false" foreignKeyName="fk_address_employee" references="airplane(sid_i)"/>
+            </column>
+            <column name="active_flag" type="boolean" defaultValueBoolean="true"/>
+        </createTable>
+    </changeSet>
+    <changeSet author="liquibase-docs" id="airportPlaneLandingReportProcedure">
+        <createProcedure catalogName="report"
+                         dbms="postgresql"
+                         encoding="utf8"
+                         relativeToChangelogFile="true"
+                         schemaName="airlines">
+            CREATE OR REPLACE FUNCTION AIRPORT_PLANE_LANDING_REPORT(IATA_CODE VARCHAR(50))
+            RETURNS refcursor AS $$
+            DECLARE
+            ref refcursor;
+            BEGIN
+            OPEN ref FOR
+            select
+            aprt.iata_code_c as airport_iata_code,
+            aprt.name_c as airport_name,
+            apln.reg_num_c as airplane_reg_num,
+            apln.type_c as airplane_type,
+            count(*) as landings
+            from actual_flight af
+            left join airport aprt on aprt.iata_code_c = af.arrival_airport_id_c
+            left join airplane apln on af.plane_sid_i = apln.sid_i
+            where arrival_airport_id_c = IATA_CODE
+            group by apln.sid_i, apln.reg_num_c, apln.type_c, aprt.iata_code_c, aprt.name_c;
+            RETURN ref;
+            END;
+            $$
+            LANGUAGE plpgsql;
+        </createProcedure>
+    </changeSet>
+</databaseChangeLog>
